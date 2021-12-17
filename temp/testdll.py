@@ -19,7 +19,7 @@ ip = '192.168.1.88'
 
 flag = False
 count = 0
-while count < 3:
+while count < 8:
     print('init...')
     if pDll.IRSDK_InitConnect(ctypes.c_wchar_p(ip), len(ip)) == 1:
         print('连接成功')
@@ -27,20 +27,11 @@ while count < 3:
         break
     count += 1
 
-box = []
-box.append(20)
-box.append(40)
-box.append(40)
-box.append(40)
-box.append(40)
-box.append(60)
-box.append(20)
-box.append(40)
-
+box = [20, 40, 40, 40, 40, 60, 20, 40]
+box.extend([100, 100, 200, 100, 200, 200, 100, 200])
 array = (ctypes.c_float * len(box))(*box)
 p = (ctypes.c_float * 5)()
 
-print('------------------')
 # pDll.draw_circle(rows, cols, img.ctypes.data_as(C.POINTER(C.c_ubyte)), ret_img.ctypes.data_as(C.POINTER(C.c_ubyte)))
 # cv2.imshow('circle', circle_img)
 
@@ -50,16 +41,16 @@ cv2.moveWindow('src', 100, 200)
 while flag:
     if pDll.IRSDK_GetRgbFrame(ret_img.ctypes.data_as(C.POINTER(C.c_ubyte))) == 1:
         # pDll.IRSDK_GetRgbFrame(ret_img.ctypes.data_as(C.POINTER(C.c_ubyte)))
-        print("****")
-        print(ret_img.shape)
         cv2.imshow("src", ret_img)
-        # ll = pDll.getObjTemper(array, p, 1)
-        #
-        # for i in range(1):
-        #     print(p[i])
+        ll = pDll.getObjTemper(array, p, 2)
+
+        for i in range(2):
+            print(p[i])
 
         if cv2.waitKey(100) == ord('q'):
             break
 
 pDll.IRSDK_Release()
 cv2.destroyAllWindows()
+
+
