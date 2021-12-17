@@ -190,7 +190,8 @@ if __name__ == '__main__':
         cv2.imshow("src", frame)
 
         ret, frame = cap.read()
-        cv2.waitKey(10)
+        if cv2.waitKey(5) == ord(' '):
+            break
     cv2.destroyAllWindows()
 
     # path = r'./data/images/'
