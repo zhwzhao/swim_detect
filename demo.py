@@ -48,12 +48,12 @@ def letterbox(img, new_shape=(640, 640), color=(114, 114, 114), auto=True, scale
 
 
 class TargetDetector:
-    def __init__(self, weight='./data/weights/best.pt'):
+    def __init__(self, weight='./data/weights/best.pt', ret_drawbox=True):
         parser = argparse.ArgumentParser()
         parser.add_argument('--weights', nargs='+', type=str, default='yolov5s.pt', help='model.pt path(s)')
         parser.add_argument('--source', type=str, default='data/images', help='source')  # file/folder, 0 for webcam
         parser.add_argument('--img-size', type=int, default=640, help='inference size (pixels)')
-        parser.add_argument('--conf-thres', type=float, default=0.65, help='object confidence threshold')
+        parser.add_argument('--conf-thres', type=float, default=0.45, help='object confidence threshold')
         parser.add_argument('--iou-thres', type=float, default=0.45, help='IOU threshold for NMS')
         parser.add_argument('--hide-labels', type=bool, default=False, help='hide labels')
         parser.add_argument('--hide-conf', type=bool, default=False, help='hide conf')
@@ -71,6 +71,7 @@ class TargetDetector:
         parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
         opt = parser.parse_args()
         self.opt = opt
+        self.drawbox = ret_drawbox
         imgsz = opt.img_size
 
         with torch.no_grad():
@@ -118,19 +119,21 @@ class TargetDetector:
             det = pred[0]
             det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
 
-            annotator = Annotator(im0, line_width=3, example=str('abc'))
-
             ret = det.cpu().numpy()
-            names = ['person']
-            colors = [[random.randint(0, 255) for _ in range(3)] for _ in names]
-            colors = [[0, 0, 255]]
-            for *xyxy, conf, cls in ret:
-                c = int(cls)  # integer class
-                label = None if opt.hide_labels else (names[c] if opt.hide_conf else f'{names[c]} {conf:.2f}')
-                annotator.box_label(xyxy, label, color=colors[int(cls)])
+
+            if self.drawbox:
+                annotator = Annotator(im0, line_width=3, example=str('abc'))
+
+                names = ['person']
+                colors = [[random.randint(0, 255) for _ in range(3)] for _ in names]
+                colors = [[0, 0, 255]]
+                for *xyxy, conf, cls in ret:
+                    c = int(cls)  # integer class
+                    label = None if opt.hide_labels else (names[c] if opt.hide_conf else f'{names[c]} {conf:.2f}')
+                    annotator.box_label(xyxy, label, color=colors[int(cls)])
             # cv2.imshow('img', im0)
             # cv2.waitKey(0)
-            return det.cpu().numpy(), im0
+            return ret  # , im0
 
     # 五颜六色，弃
     def addBox(self, img, pred):
@@ -152,14 +155,14 @@ class TargetDetector:
 
             annotator = Annotator(im0, line_width=3, example=str('abc'))
 
-            names = ['person']
-            colors = [[random.randint(0, 255) for _ in range(3)] for _ in names]
-            for id, ret in pred.items():
-                # print(type(ret))
-                *xyxy, conf, cls = ret
-                # c = int(cls)  # integer class
-                # label = None if opt.hide_labels else (names[c] if opt.hide_conf else f'{names[c]} {conf:.2f}')
-                annotator.box_label(xyxy, str(id), color=colors[int(cls)])
+            # names = ['person']
+            # colors = [[random.randint(0, 255) for _ in range(3)] for _ in names]
+            # for id, ret in pred.items():
+            #     # print(type(ret))
+            #     *xyxy, conf, cls = ret
+            #     # c = int(cls)  # integer class
+            #     # label = None if opt.hide_labels else (names[c] if opt.hide_conf else f'{names[c]} {conf:.2f}')
+            #     annotator.box_label(xyxy, str(id), color=colors[int(cls)])
         return im0
 
 
@@ -178,15 +181,15 @@ def plot_one_box(x, img, color=None, label=None, line_thickness=3):
 
 
 if __name__ == '__main__':
-    TD = TargetDetector()
-
+    TD = TargetDetector('./data/weights/best_swim_1220.pt')
     video_path = 'rtsp://admin:123@192.168.1.51:554'
+    video_path = './data/video/20211102195133468.avi'
     cap = cv2.VideoCapture(video_path)
     ret, frame = cap.read()
     cv2.namedWindow('src', cv2.WINDOW_GUI_NORMAL)
     while ret:
         # box = [[500, 500, 700, 700], [100, 100, 200, 200], [500, 400, 600, 600], [0,0,200, 700]]
-        pred, frame = TD.detect(frame)
+        pred = TD.detect(frame)
         cv2.imshow("src", frame)
 
         ret, frame = cap.read()
