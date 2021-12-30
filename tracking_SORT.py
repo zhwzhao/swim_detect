@@ -7,20 +7,20 @@ from threading import Thread
 import threading
 import cv2
 from matplotlib.pyplot import draw
-from numpy import exp2
 from sort import *
-from demo import TargetDetector
+from demo import TargetDetector, generate_mask
 from demo import plot_one_box
 
-TD = TargetDetector()
 
 # videopath = r'./data/video/20211102195133468.avi'
 # videopath = r'./data/video/20211101181037570.avi'
 videopath = 'rtsp://admin:123@192.168.1.51:554'
 
-select = input("please select input(1:video, 2:stream): ")
+select = input("please select input(1:video, 2:stream, 3:shenzhen video): ")
 if select == '2':  # 输入2为流
     videopath = 'rtsp://admin:123@192.168.1.51:554'
+elif select == '3':
+    videopath = r'./data/video/20211221143005488.avi'
 else:  # 默认视频
     videopath = r'./data/video/20211102195133468.avi'
 print(f'video_path:{videopath}\n')
@@ -84,15 +84,17 @@ def plot_one_box(x, img, color=None, label=None, line_thickness=3, outFlag=False
         cv2.rectangle(img, c1, c2, color, -1, cv2.LINE_AA)  # filled
         cv2.putText(img, label, (c1[0], c1[1] - 2), 0, tl / 3, [225, 255, 255], thickness=tf, lineType=cv2.LINE_AA)
 
-    global outText
+    global outText, count
     if outFlag:
-        outText.setdefault(str(color), []).append([label, x])
+        if float(label) in count:
+            outText.setdefault(str(color), []).append([label, count[float(label)], x])
+        else:
+            outText.setdefault(str(color), []).append([label, 0, x])
 
-
+count = {}
 def tracking():
     global point1, point2, startEnd, drawing, e1
     cap = cv2.VideoCapture(videopath)
-    cv2.namedWindow('Stream', cv2.WINDOW_GUI_NORMAL)
     mot_tracker = Sort()
 
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -113,13 +115,18 @@ def tracking():
     T = 30
     Tb = 5
     Tc = 150
-    count = {}
+    global count
     timer = {}
     boundTimer = {}
     selectPerson = {}
     global e2
     outFlag = False
 
+    ret, frame = cap.read()
+    mask = generate_mask(frame) if ret else None
+    TD = TargetDetector(mask_img=mask)
+
+    cv2.namedWindow('Stream', cv2.WINDOW_GUI_NORMAL)
     cv2.setMouseCallback("Stream", on_mouse)
     while True:
         # if e2 != None:  # 键入选中
@@ -127,7 +134,7 @@ def tracking():
 
         outFlag = False
         outText.clear()
-        if frames % 5 == 0:
+        if frames % 24 == 0:
             outFlag = True
 
         ret, frame = cap.read()
@@ -140,11 +147,29 @@ def tracking():
             tracked_objects = mot_tracker.update(detections)
             # print(tracked_objects)
 
+            # obj_id:<class 'numpy.float64'>   ==> float()
             for *box, obj_id in tracked_objects:
                 clr = LIGHT_GREEN  # ligth green
                 line_thickness = 3
                 label = str(obj_id.astype(int))
 
+                for key, value in e2.items():
+                    if label == key:
+                        if value == "1": # 值为1，计时
+                            if obj_id not in selectPerson: # 没有：加入, 开始计时
+                                selectPerson[obj_id] = box
+                            elif obj_id in selectPerson:
+                                if selectPerson[obj_id] == None: # 另一种没有（）
+                                    selectPerson[obj_id] = box
+                                else: # 有，不做操作，继续计时
+                                    pass
+                        else: # 值为0，停止计时
+                            if obj_id in selectPerson:
+                                if selectPerson[obj_id] != None:
+                                    selectPerson[obj_id] = None
+                                    count[obj_id] = 0
+
+                '''单序号输入
                 if e2 != None:  # 键入选中
                     oid = str(obj_id.astype(int))
                     # print("notNone")
@@ -163,6 +188,7 @@ def tracking():
                                 selectPerson[obj_id] = None
                                 count[obj_id] = 0
                         e2 = None
+                '''
 
                 if obj_id in selectPerson and selectPerson[obj_id] != None:  # 特判
                     # 计时？
@@ -209,34 +235,46 @@ def tracking():
 
         if outFlag:
             # print(outText)
-            with open("output.txt", "w") as file:
-                file.write('(green):\n')
+            with open("output.sos", "w") as file:
+                file.write('[green]:\n')
                 if str(GREEN) in outText:  # 绿框
-                    for k, v in outText[str(GREEN)]:
+                    for k, t, v in outText[str(GREEN)]:
                         file.write(k)
-                        file.write(" ")
-                        file.write(str(v))
+                        # file.write(" ")
+                        for xy in v:
+                            file.write(", ")
+                            file.write(str(int(xy)))
+                        file.write(', ')
+                        file.write(str(int(t/24)))
                         file.write('\n')
                 file.write('\n')
-                file.write('(yellow):\n')
+                file.write('[yellow]:\n')
                 if str(YELLOW) in outText:  # 黄框
-                    for k, v in outText[str(YELLOW)]:
+                    for k, t, v in outText[str(YELLOW)]:
                         file.write(k)
-                        file.write(" ")
-                        file.write(str(v))
+                        # file.write(" ")
+                        for xy in v:
+                            file.write(", ")
+                            file.write(str(int(xy)))
+                        file.write(', ')
+                        file.write(str(int(t/24)))
                         file.write('\n')
                 file.write('\n')
-                file.write('(red):\n')
+                file.write('[red]:\n')
                 if str(RED) in outText:  # 红框
-                    for k, v in outText[str(RED)]:
+                    for k, t, v in outText[str(RED)]:
                         file.write(k)
-                        file.write(" ")
-                        file.write(str(v))
+                        # file.write(" ")
+                        for xy in v:
+                            file.write(", ")
+                            file.write(str(int(xy)))
+                        file.write(', ')
+                        file.write(str(int(t/24)))
                         file.write('\n')
                 file.write('\n')
 
-        if e2 != None:
-            e2 = None
+        # if e2 != None:
+        #     e2 = None
         # # 鼠标框选事件
         # if point1 != point2:
         #     cv2.rectangle(img, point1, point2, (0, 0, 0), thickness=3, lineType=cv2.LINE_AA)
@@ -255,12 +293,12 @@ def tracking():
 
         # img = cv2.resize(img, (1080, 720))
         cv2.imshow('Stream', img)
-        cv2.waitKey(1)
+
         # vid_writer.write(frame)
 
         frames += 1
         ch = 0xFF & cv2.waitKey(1)
-        if ch == 27:
+        if ch == 27 or cv2.waitKey(1) == ord(' '):
             break
 
     totaltime = time.time() - starttime
@@ -275,7 +313,7 @@ from tkinter import *
 from tkinter import messagebox
 
 e1 = None
-e2 = None
+e2 = {}
 
 
 def show():
@@ -309,16 +347,30 @@ def input():
 # txtInput
 def txtInput():
     global e2
-    if not os.path.exists("input.txt"):
-        os.makedirs("input.txt")
+    path = "C:/Windows/Temp/68768787.sos"
+    t0 = 0
+    # 创建的是目录，不是文件
+    # if not os.path.exists("input.txt"):
+    #     os.makedirs("input.txt")
     while True:
-
-        with open("input.txt", 'r+') as f:
-            for line in f:
-                e2 = line.strip()
-                print(e2)
-                sleep(0.01)
-            f.truncate(0)
+        # t1 = os.stat(path).st_mtime
+        # if t1 > t0: #文件更新过
+        #     t0 = t1
+        with open(path, 'r+') as f:
+            line = f.readline()
+            while line:
+                tmp = line.strip()
+                a = str(tmp.split(',', 1)[0])
+                b = str(tmp.split(',', 1)[1])
+                e2[a] = b
+                # print(a, b)
+                line = f.readline()
+        # with open("C:/Windows/Temp/68768787.sos", 'r+') as f:
+        #     for line in f:
+        #         e2 = line.strip()
+        #         print(e2)
+        #         sleep(0.01)
+        #     f.truncate(0)
 
 
 
