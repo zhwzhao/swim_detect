@@ -4,6 +4,7 @@ import random
 from threading import Thread
 import threading
 from utils.sort import *
+from utils.util import *
 from demo import generate_mask
 from RedRay_Video import *
 
@@ -27,16 +28,6 @@ LIGHT_GREEN = (204, 232, 207)
 RED = (0, 0, 255)
 GREEN = (0, 255, 0)
 YELLOW = (0, 255, 255)
-
-
-def calDistance(a, b):
-    centerAx = (a[2] - a[0]) / 2 + a[0]
-    centerAy = (a[3] - a[1]) / 2 + a[1]
-    centerBx = (b[2] - b[0]) / 2 + b[0]
-    centerBy = (b[3] - b[1]) / 2 + b[1]
-    d = math.hypot(centerAx - centerBx, centerAy - centerBy)
-    # print(d)
-    return d
 
 
 def plot_one_box(x, img, color=None, label=None, line_thickness=3, outFlag=False):
