@@ -5,7 +5,7 @@ import random
 from threading import Thread
 import threading
 import cv2
-from sort import *
+from utils.sort import *
 from demo import TargetDetector, generate_mask
 from demo import plot_one_box
 from RedRay_Video import *
@@ -120,9 +120,10 @@ def read_frame(q, video_path):
 
         # 在detections的最后一列加上每个目标的温度，如果连接红外失败则温度为0
         if temper_flag:
+            print(11)
             if len(detections) > 0:
                 temper = get_temper(detections[:, :4])
-                # print(temper)
+                print(temper)
                 # detections = np.c_[detections, temper]
             # else:
             # detections = np.c_[detections, np.zeros(len(detections))]

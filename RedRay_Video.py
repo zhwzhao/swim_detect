@@ -19,7 +19,7 @@ matrix, back_matrix = None, None
 ray_img = None
 
 
-def get_temper(box, frame, ret_img):
+def get_temper(box, frame=None, ret_img=None):
     matrix, back_matrix = load_matrix()
     # for pp in box:
     #     cv2.rectangle(frame, (pp[0], pp[1]), (pp[2], pp[3]), (0, 0, 255), thickness=3)
@@ -50,7 +50,7 @@ def load_ray_video(ip):
     count = 0
     flag = False
     print('connecting, Please waiting ...')
-    while True: # count < 20:
+    while True:  # count < 20:
         if pDll.IRSDK_InitConnect(ctypes.c_wchar_p(ip), len(ip)) == 1:
             print('connect success')
             flag = True
@@ -71,8 +71,8 @@ def load_ray_video(ip):
             # if cv2.waitKey(100) == ord(' '):
             #     break
             ray_img = ret_img
-            break
-    return
+            return True
+    return False
 
 
 def run(rtsp, ip):
@@ -88,7 +88,7 @@ def run(rtsp, ip):
     # if ray_img is not None:
     #     cv2.imshow('ray', ray_img)
 
-    TD = TargetDetector(weight='./data/weights/best_swim_1220.pt', ret_drawbox=False)
+    TD = TargetDetector(weight='./data/weights/best_swim_1220.pt')
 
     cap = cv2.VideoCapture(rtsp)
     ret, frame = cap.read()
@@ -123,7 +123,7 @@ def run(rtsp, ip):
         if cv2.waitKey(1) == ord(' '):
             break
     t2 = time.time()
-    print((t2-t1)/count)
+    print((t2 - t1) / count)
     cv2.destroyAllWindows()
     pDll.IRSDK_Release()
 
