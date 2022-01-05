@@ -1,15 +1,10 @@
 import math
-from os import write
 # from os import tcgetpgrp
-from time import sleep
 import random
 from threading import Thread
 import threading
-import cv2
-from matplotlib.pyplot import draw
-from sort import *
-from demo import TargetDetector, generate_mask
-from demo import plot_one_box
+from utils.sort import *
+from demo import generate_mask
 from RedRay_Video import *
 
 # videopath = r'./data/video/20211102195133468.avi'
@@ -25,33 +20,13 @@ else:  # 默认视频
     videopath = r'./data/video/20211102195133468.avi'
 print(f'video_path:{videopath}\n')
 
-point1, point2 = None, None
-startEnd = False
-drawing = False
+e2 = {}
 outText = {}
+count = {}
 LIGHT_GREEN = (204, 232, 207)
 RED = (0, 0, 255)
 GREEN = (0, 255, 0)
 YELLOW = (0, 255, 255)
-
-
-def on_mouse(event, x, y, flags, param):
-    global point1, point2, startEnd, drawing
-    if event == cv2.EVENT_LBUTTONDOWN:  # 左键点击
-        startEnd = True
-        drawing = True
-        point1 = (int(x), int(y))
-        point2 = point1
-    elif event == cv2.EVENT_MOUSEMOVE and (flags & cv2.EVENT_FLAG_LBUTTON):  # 按住左键拖曳
-        startEnd = False
-        drawing = True
-        point2 = (int(x), int(y))
-    elif event == cv2.EVENT_LBUTTONUP:  # 左键释放
-        startEnd = True
-        drawing = False
-        point2 = (int(x), int(y))
-    elif event == cv2.EVENT_RBUTTONUP:  # 右键取消选择
-        point1, point2 = None, None
 
 
 def calDistance(a, b):
@@ -92,11 +67,7 @@ def plot_one_box(x, img, color=None, label=None, line_thickness=3, outFlag=False
             outText.setdefault(str(color), []).append([label, 0, x])
 
 
-count = {}
-
-
 def tracking():
-    global point1, point2, startEnd, drawing, e1
     cap = cv2.VideoCapture(videopath)
     mot_tracker = Sort()
 
@@ -108,8 +79,6 @@ def tracking():
                                  (w, h))
 
     frames = 0
-
-
     tracked_objects_previous = {}
     clr = (0, 255, 0)
     line_thickness = 3
@@ -125,7 +94,8 @@ def tracking():
     global e2
     outFlag = False
 
-    ray_img = load_ray_video(ip)
+    # pr = Process(target=load_ray_video, args=(config.ip,))
+    # pr.start()
 
     ret, frame = cap.read()
     mask = generate_mask(frame) if ret else None
@@ -133,11 +103,7 @@ def tracking():
     starttime = time.time()
 
     cv2.namedWindow('Stream', cv2.WINDOW_GUI_NORMAL)
-    cv2.setMouseCallback("Stream", on_mouse)
     while True:
-        # if e2 != None:  # 键入选中
-        #     print(type(e2))
-
         outFlag = False
         outText.clear()
         if frames % 24 == 0:
@@ -147,22 +113,20 @@ def tracking():
         if not ret:
             break
         detections = TD.detect(frame)
-
         # 在detections的最后一列加上每个目标的温度，如果连接红外失败则温度为0
-        if ray_img is not None:
-            ray_c = ray_img.copy()
-            if len(detections) > 0:
-                temper = get_temper(detections[:, :4], frame, ray_c)
-                print(temper)
-                detections = np.c_[detections, temper]
-            else:
-                detections = np.c_[detections, np.zeros(len(detections))]
+
+        # if ray_img is not None:
+        #     ray_c = ray_img.copy()
+        #     if len(detections) > 0:
+        #         temper = get_temper(detections[:, :4], frame, ray_c)
+        #         print(temper)
+        #         # detections = np.c_[detections, temper]
+        #     # else:
+        #         # detections = np.c_[detections, np.zeros(len(detections))]
 
         img = np.asarray(frame)
         if detections is not None:
-            # print(detections)
             tracked_objects = mot_tracker.update(detections)
-            # print(tracked_objects)
 
             # obj_id:<class 'numpy.float64'>   ==> float()
             for *box, obj_id in tracked_objects:
@@ -185,27 +149,6 @@ def tracking():
                                 if selectPerson[obj_id] != None:
                                     selectPerson[obj_id] = None
                                     count[obj_id] = 0
-
-                '''单序号输入
-                if e2 != None:  # 键入选中
-                    oid = str(obj_id.astype(int))
-                    # print("notNone")
-                    if oid == e2:
-                        # print("==")
-                        if obj_id not in selectPerson:  # 没有：加入，开始计时
-                            # print("1")
-                            selectPerson[obj_id] = box
-                        elif obj_id in selectPerson:
-                            # print("2")
-                            if selectPerson[obj_id] == None:  # 另一种没有（）
-                                # print("3")
-                                selectPerson[obj_id] = box
-                            else:  # 有：清空
-                                # print("4")
-                                selectPerson[obj_id] = None
-                                count[obj_id] = 0
-                        e2 = None
-                '''
 
                 if obj_id in selectPerson and selectPerson[obj_id] != None:  # 特判
                     # 计时？
@@ -232,8 +175,6 @@ def tracking():
                                 boundTimer[obj_id] = boundTimer[obj_id] + 1
                                 if boundTimer[obj_id] >= Tb:
                                     timer[obj_id] = 0
-
-
                     else:  # 速度慢，加入队列
                         if obj_id not in timer:  # 计时器计数
                             timer[obj_id] = 0
@@ -251,13 +192,11 @@ def tracking():
                 tracked_objects_previous[obj_id] = [x1, y1, x2, y2]
 
         if outFlag:
-            # print(outText)
             with open("output.sos", "w") as file:
                 file.write('[green]:\n')
                 if str(GREEN) in outText:  # 绿框
                     for k, t, v in outText[str(GREEN)]:
                         file.write(k)
-                        # file.write(" ")
                         for xy in v:
                             file.write(", ")
                             file.write(str(int(xy)))
@@ -269,7 +208,6 @@ def tracking():
                 if str(YELLOW) in outText:  # 黄框
                     for k, t, v in outText[str(YELLOW)]:
                         file.write(k)
-                        # file.write(" ")
                         for xy in v:
                             file.write(", ")
                             file.write(str(int(xy)))
@@ -281,7 +219,6 @@ def tracking():
                 if str(RED) in outText:  # 红框
                     for k, t, v in outText[str(RED)]:
                         file.write(k)
-                        # file.write(" ")
                         for xy in v:
                             file.write(", ")
                             file.write(str(int(xy)))
@@ -290,29 +227,7 @@ def tracking():
                         file.write('\n')
                 file.write('\n')
 
-        # if e2 != None:
-        #     e2 = None
-        # # 鼠标框选事件
-        # if point1 != point2:
-        #     cv2.rectangle(img, point1, point2, (0, 0, 0), thickness=3, lineType=cv2.LINE_AA)
-        #     if startEnd == True and drawing == False:
-        #         for *box, obj_id in tracked_objects: # 找出被选中的人
-        #             centerX = (box[2]+box[0])/2
-        #             centerY = (box[3]+box[1])/2
-        #             if centerX >= point1[0] and centerX <= point2[0] and centerY >= point1[1] and centerY <=point2[1]:
-        #                 selectPerson[obj_id] = box
-        #                 # print(selectPerson[obj_id])
-        #         point1 = point2
-        # else:
-        #     if point1 == None and point2 == None: # 右键清楚选中
-        #         selectPerson.clear()
-        #         count.clear()
-
-        # img = cv2.resize(img, (1080, 720))
         cv2.imshow('Stream', img)
-
-        # vid_writer.write(frame)
-
         frames += 1
         ch = 0xFF & cv2.waitKey(1)
         if ch == 27 or cv2.waitKey(1) == ord(' '):
@@ -323,51 +238,15 @@ def tracking():
     cv2.destroyAllWindows()
     vid_writer.release()
 
-from tkinter import *
-
-e1 = None
-e2 = {}
-
-
-def show():
-    global e1, e2
-    print("id:%s" % e1.get())  # 获取用户输入的信息
-    e2 = e1.get()
-    e1.delete(0, END)
-
-
-def input():
-    global e1
-    root = Tk()
-    root.title("Input")
-
-    Label1 = Label(root, text='id:').grid(row=0, column=0)
-
-    v1 = StringVar()
-    e1 = Entry(root, textvariable=v1)  # Entry 是 Tkinter 用来接收字符串等输入的控件.
-    e1.grid(row=0, column=1, padx=10, pady=5)  # 设置输入框显示的位置，以及长和宽属性
-
-    lock.acquire()
-    Button(root, text='confirm', width=10, command=show).grid(row=2, column=0, sticky=W, padx=10, pady=5)
-    lock.release()
-
-    Button(root, text='quit', width=10, command=root.quit).grid(row=2, column=1, sticky=E, padx=10, pady=5)
-
-    mainloop()
-
 
 # txtInput
 def txtInput():
     global e2
     path = "C:/Windows/Temp/68768787.sos"
-    t0 = 0
-    # 创建的是目录，不是文件
-    # if not os.path.exists("input.txt"):
-    #     os.makedirs("input.txt")
+    if not os.path.exists(path):
+        f = open(path, 'w+')
+        f.close()
     while True:
-        # t1 = os.stat(path).st_mtime
-        # if t1 > t0: #文件更新过
-        #     t0 = t1
         with open(path, 'r+') as f:
             line = f.readline()
             while line:
@@ -375,23 +254,13 @@ def txtInput():
                 a = str(tmp.split(',', 1)[0])
                 b = str(tmp.split(',', 1)[1])
                 e2[a] = b
-                # print(a, b)
                 line = f.readline()
         time.sleep(1)
-        # with open("C:/Windows/Temp/68768787.sos", 'r+') as f:
-        #     for line in f:
-        #         e2 = line.strip()
-        #         print(e2)
-        #         sleep(0.01)
-        #     f.truncate(0)
 
 
 # main
-lock = threading.Lock()
 t1 = Thread(target=tracking)
-# t2 = Thread(target=input)
 t3 = Thread(target=txtInput, daemon=True)
 
 t1.start()
-# t2.start()
 t3.start()
