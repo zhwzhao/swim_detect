@@ -10,7 +10,7 @@ from matplotlib.pyplot import draw
 from sort import *
 from demo import TargetDetector, generate_mask
 from demo import plot_one_box
-
+from RedRay_Video import *
 
 # videopath = r'./data/video/20211102195133468.avi'
 # videopath = r'./data/video/20211101181037570.avi'
@@ -91,7 +91,10 @@ def plot_one_box(x, img, color=None, label=None, line_thickness=3, outFlag=False
         else:
             outText.setdefault(str(color), []).append([label, 0, x])
 
+
 count = {}
+
+
 def tracking():
     global point1, point2, startEnd, drawing, e1
     cap = cv2.VideoCapture(videopath)
@@ -105,7 +108,7 @@ def tracking():
                                  (w, h))
 
     frames = 0
-    starttime = time.time()
+
 
     tracked_objects_previous = {}
     clr = (0, 255, 0)
@@ -122,9 +125,12 @@ def tracking():
     global e2
     outFlag = False
 
+    ray_img = load_ray_video(ip)
+
     ret, frame = cap.read()
     mask = generate_mask(frame) if ret else None
     TD = TargetDetector(mask_img=mask)
+    starttime = time.time()
 
     cv2.namedWindow('Stream', cv2.WINDOW_GUI_NORMAL)
     cv2.setMouseCallback("Stream", on_mouse)
@@ -141,6 +147,17 @@ def tracking():
         if not ret:
             break
         detections = TD.detect(frame)
+
+        # 在detections的最后一列加上每个目标的温度，如果连接红外失败则温度为0
+        if ray_img is not None:
+            ray_c = ray_img.copy()
+            if len(detections) > 0:
+                temper = get_temper(detections[:, :4], frame, ray_c)
+                print(temper)
+                detections = np.c_[detections, temper]
+            else:
+                detections = np.c_[detections, np.zeros(len(detections))]
+
         img = np.asarray(frame)
         if detections is not None:
             # print(detections)
@@ -149,21 +166,21 @@ def tracking():
 
             # obj_id:<class 'numpy.float64'>   ==> float()
             for *box, obj_id in tracked_objects:
-                clr = LIGHT_GREEN  # ligth green
+                clr = LIGHT_GREEN  # light green
                 line_thickness = 3
                 label = str(obj_id.astype(int))
 
                 for key, value in e2.items():
                     if label == key:
-                        if value == "1": # 值为1，计时
-                            if obj_id not in selectPerson: # 没有：加入, 开始计时
+                        if value == "1":  # 值为1，计时
+                            if obj_id not in selectPerson:  # 没有：加入, 开始计时
                                 selectPerson[obj_id] = box
                             elif obj_id in selectPerson:
-                                if selectPerson[obj_id] == None: # 另一种没有（）
+                                if selectPerson[obj_id] is None:  # 另一种没有（）
                                     selectPerson[obj_id] = box
-                                else: # 有，不做操作，继续计时
+                                else:  # 有，不做操作，继续计时
                                     pass
-                        else: # 值为0，停止计时
+                        else:  # 值为0，停止计时
                             if obj_id in selectPerson:
                                 if selectPerson[obj_id] != None:
                                     selectPerson[obj_id] = None
@@ -245,7 +262,7 @@ def tracking():
                             file.write(", ")
                             file.write(str(int(xy)))
                         file.write(', ')
-                        file.write(str(int(t/24)))
+                        file.write(str(int(t / 24)))
                         file.write('\n')
                 file.write('\n')
                 file.write('[yellow]:\n')
@@ -257,7 +274,7 @@ def tracking():
                             file.write(", ")
                             file.write(str(int(xy)))
                         file.write(', ')
-                        file.write(str(int(t/24)))
+                        file.write(str(int(t / 24)))
                         file.write('\n')
                 file.write('\n')
                 file.write('[red]:\n')
@@ -269,7 +286,7 @@ def tracking():
                             file.write(", ")
                             file.write(str(int(xy)))
                         file.write(', ')
-                        file.write(str(int(t/24)))
+                        file.write(str(int(t / 24)))
                         file.write('\n')
                 file.write('\n')
 
@@ -306,11 +323,7 @@ def tracking():
     cv2.destroyAllWindows()
     vid_writer.release()
 
-
-# input
-import tkinter
 from tkinter import *
-from tkinter import messagebox
 
 e1 = None
 e2 = {}
@@ -343,7 +356,6 @@ def input():
     mainloop()
 
 
-
 # txtInput
 def txtInput():
     global e2
@@ -365,13 +377,13 @@ def txtInput():
                 e2[a] = b
                 # print(a, b)
                 line = f.readline()
+        time.sleep(1)
         # with open("C:/Windows/Temp/68768787.sos", 'r+') as f:
         #     for line in f:
         #         e2 = line.strip()
         #         print(e2)
         #         sleep(0.01)
         #     f.truncate(0)
-
 
 
 # main
